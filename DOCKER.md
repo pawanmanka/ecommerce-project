@@ -1,18 +1,19 @@
-# Run Kafka and both services with Docker
+# Run Kafka and services with Docker
 
 Docker Compose provides a local single-broker Kafka service and builds/runs
-auth-service and user-service. Both application services use the existing MySQL
-server on the host machine; Compose does not start or modify a database
-container. Kafka is configured as a local development broker with plaintext
-listeners; do not expose it to untrusted networks.
+auth-service, user-service, and product-service. Application services use the
+existing MySQL server on the host machine; Compose does not start or modify a
+database container. Kafka is configured as a local development broker with
+plaintext listeners; do not expose it to untrusted networks.
 
 ## Configure
 
 1. Ensure Docker Desktop is running and the local MySQL server is accepting
    connections.
-2. Configure `auth-service/.env` and `user-service/.env` with the local MySQL
-   credentials and database names. The Compose file overrides `DB_HOST` to
-   `host.docker.internal` so containers connect to the host.
+2. Configure `auth-service/.env`, `user-service/.env`, and
+   `product-service/.env` with local MySQL credentials and database names. The
+   Compose file overrides `DB_HOST` to `host.docker.internal` so containers
+   connect to the host.
 3. Set the same `JWT_SECRET` in both service environment files.
 4. Start Kafka and provision the registration topic before either API:
 
@@ -27,24 +28,29 @@ listeners; do not expose it to untrusted networks.
    ```sh
    cd auth-service && yarn migration:run
    cd ../user-service && yarn migration:run
+   cd ../product-service && yarn migration:run && yarn seed
    ```
 
-   These migration commands use `localhost` from the host environment. If the
-   existing `.env` files do not specify it, set `DB_HOST=localhost` for the
-   host-side command.
+   The product migrations create category, product, image, specification, and
+   tag tables. Its seed command imports root `product.json` in one transaction.
+   These commands use the database settings in each service's `.env`; use
+   `DB_HOST=localhost` for host-side commands.
 
 ## Start the APIs
 
 From this workspace directory:
 
 ```sh
-docker compose -f compose.yaml up --build -d auth-service user-service
+docker compose -f compose.yaml up --build -d auth-service user-service product-service
 ```
 
-Compose runs both APIs in Nest watch mode and bind-mounts each service's source
-directory. Saving changes to files under `auth-service/` or `user-service/`
-automatically rebuilds and restarts the corresponding container's app. The
-containers wait for Kafka's health check and topic setup before starting.
+Compose runs the APIs in Nest watch mode and bind-mounts each service's source
+directory. Saving service source changes automatically rebuilds and restarts
+the corresponding app. Both services wait for Kafka's health check and topic
+setup. Product service is independent of Kafka and serves port `3003`.
+
+The product container mounts root `product.json` at
+`/catalog/product.json` for seeding.
 
 Changes to `package.json` or `yarn.lock` require rebuilding the corresponding
 service so its dependencies are updated:
@@ -52,12 +58,13 @@ service so its dependencies are updated:
 ```sh
 docker compose -f compose.yaml up --build -d auth-service
 docker compose -f compose.yaml up --build -d user-service
+docker compose -f compose.yaml up --build -d product-service
 ```
 
 To follow application startup and watch-mode rebuilds:
 
 ```sh
-docker compose -f compose.yaml logs -f auth-service user-service
+docker compose -f compose.yaml logs -f auth-service user-service product-service
 ```
 
 The Dockerfiles also retain a production runtime image target for deployments;
@@ -84,7 +91,9 @@ The services are available at:
 - Auth: `http://localhost:3001/api/v1/auth/...`
 - User profile: `http://localhost:3002/api/v1/profile` (send the auth service
   access token as `Authorization: Bearer <token>`)
+- Categories: `http://localhost:3003/api/v1/categories`
+- Products: `http://localhost:3003/api/v1/products`
 
-Both services use the `/api/v1` prefix.
+All APIs use the `/api/v1` prefix.
 To stop the services, press Ctrl+C, or run
 `docker compose -f compose.yaml down` from this directory.
