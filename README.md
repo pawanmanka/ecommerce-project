@@ -19,10 +19,16 @@ To import only the JSON `categories` key into the categories table, run
 `/Volumes/Work/Nest js projects/product.json`; set `PRODUCT_CATALOG_FILE` to
 override this path (Docker Compose sets it to `/catalog/product.json`).
 
-Category routes: `GET /api/v1/categories` and
+Category routes: `GET /api/v1/categories?page=1&limit=10` and
 `GET /api/v1/categories/:slug`. Product routes:
 `GET /api/v1/products?categoryId=<category-uuid>&search=earbuds` and
 `GET /api/v1/products/:slug`.
+All endpoints return `{ data, message, errors }`. Successful responses include
+the requested object or array in `data` and an empty `errors` array. Error
+responses use an empty array for `data` and include the error messages in
+`errors`. The category list endpoint supports `page` (default `1`) and
+`limit` (default `10`, maximum `100`) and includes `pagination` metadata with
+`page`, `limit`, `total`, and `totalPages`.
 
 All primary IDs and foreign-key references use UUIDs, including products,
 categories, and their related tables. The numeric IDs from `product.json` are

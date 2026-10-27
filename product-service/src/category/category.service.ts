@@ -1,7 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import type {
+  PaginatedData,
+  PaginationMetadata,
+} from "../common/api-response.interceptor.js";
 import { Category } from "./category.entity.js";
+
+export interface PaginatedCategories extends PaginatedData<CategoryResponse> {
+  pagination: PaginationMetadata;
+}
 
 export interface CategoryResponse {
   id: string;
@@ -20,12 +28,25 @@ export class CategoryService {
     private readonly categories: Repository<Category>,
   ) {}
 
-  async getCategories(): Promise<CategoryResponse[]> {
-    const categories = await this.categories.find({
+  async getCategories(
+    page: number,
+    limit: number,
+  ): Promise<PaginatedCategories> {
+    const [categories, total] = await this.categories.findAndCount({
       where: { isActive: true },
       order: { name: "ASC" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-    return categories.map((category) => this.toResponse(category));
+    return {
+      data: categories.map((category) => this.toResponse(category)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getBySlug(slug: string): Promise<CategoryResponse | null> {
